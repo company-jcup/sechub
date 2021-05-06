@@ -350,8 +350,8 @@ public class DeveloperAdministration {
     public String createProject(String projectId, String description, String owner, List<String> whiteListURLs, Map<String, String> metaData) {
         /* @formatter:off */
 		StringBuilder json = new StringBuilder();
-		if (description==null || description.isEmpty()) {
-			description = "description for project "+projectId;
+		if (description == null) {
+			description = "";
 		}
 		TestJSONHelper jsonHelper = TestJSONHelper.get();
 		json.append("{\n" +
@@ -362,9 +362,9 @@ public class DeveloperAdministration {
 		if (! whiteListURLs.isEmpty()) {
 			json.append(",\n \"whiteList\" : {\"uris\":[");
 
-			for (Iterator<String> it = whiteListURLs.iterator();it.hasNext();) {
+			for (Iterator<String> it = whiteListURLs.iterator(); it.hasNext();) {
 				String url = it.next();
-				json.append("\""+url+"\"");
+				json.append("\"" + url + "\"");
 				if (it.hasNext()){
 					json.append(",");
 				}
@@ -407,6 +407,14 @@ public class DeveloperAdministration {
 
     public String fetchProjectInfo(String projectId) {
         return getRestHelper().getStringFromURL(getUrlBuilder().buildAdminShowsProjectDetailsUrl(projectId));
+    }
+
+    public String fetchProjectDescription(String projectId) {
+        String json = fetchProjectInfo(projectId);
+
+        TestJSONHelper jsonHelper = TestJSONHelper.get();
+        JsonNode jsonNode = jsonHelper.readTree(json);
+        return jsonNode.get("description").textValue();
     }
 
     public String fetchUserInfo(String userId) {
@@ -491,6 +499,19 @@ public class DeveloperAdministration {
         sb.append("{\"apiVersion\":\"1.0\", \"metaData\":\n" + jsonNode.toPrettyString() + "\n}");
 
         getRestHelper().postJson(getUrlBuilder().buildUpdateProjectMetaData(projectId), sb.toString());
+    }
+
+    public String updateProjectDescription(String projectId, String description) {
+        String json = "{\n" + "  \"name\" : \"" + projectId + "\", \n" + "  \"description\" : \"" + description + "\"\n" + "}";
+
+        String url = getUrlBuilder().buildAdminChangesProjectDescriptionUrl(projectId);
+
+        return getRestHelper().postJson(url, json);
+    }
+
+    public String assignOwnerToProject(String userId, String projectId) {
+        getRestHelper().post(getUrlBuilder().buildAdminAssignsOwnerToProjectUrl(projectId, userId));
+        return "assigned " + userId + " as new owner to project " + projectId;
     }
 
     public String assignUserToProject(String userId, String projectId) {
@@ -581,6 +602,16 @@ public class DeveloperAdministration {
 
     }
 
+    public String fetchGlobalMappings(String mappingId) {
+        String url = getUrlBuilder().buildGetMapping(mappingId);
+        return getRestHelper().getJSon(url);
+    }
+
+    public String updateGlobalMappings(String mappingId, String mappingDataAsJSON) {
+        String url = getUrlBuilder().buildUpdateMapping(mappingId);
+        return getRestHelper().putJSON(url, mappingDataAsJSON);
+    }
+
     public String triggerDownloadReport(String projectId, UUID sechubJobUUID) {
         String url = getUrlBuilder().buildFetchReport(projectId, sechubJobUUID);
         return commonTriggerDownloadInBrowser(url);
@@ -601,7 +632,7 @@ public class DeveloperAdministration {
     }
 
     public String markFalsePositivesForProjectByJobData(String projectId, String json) {
-        return getRestHelper().putJSon(getUrlBuilder().buildUserAddsFalsePositiveJobDataListForProject(projectId), json);
+        return getRestHelper().putJSON(getUrlBuilder().buildUserAddsFalsePositiveJobDataListForProject(projectId), json);
     }
 
     public void deleteFalsePositivesForProject(String projectId, UUID jobUUID, int findingId) {

@@ -1,13 +1,21 @@
 // SPDX-License-Identifier: MIT
 package com.daimler.sechub.domain.administration.project;
 
-import static com.daimler.sechub.test.TestURLBuilder.*;
-import static com.daimler.sechub.test.TestURLBuilder.RestDocPathParameter.*;
-//import static org.hamcrest.CoreMatchers.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static com.daimler.sechub.test.TestURLBuilder.https;
+import static com.daimler.sechub.test.TestURLBuilder.RestDocPathParameter.PROJECT_ID;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.matches;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -36,6 +44,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.validation.Errors;
 
 import com.daimler.sechub.domain.administration.project.ProjectJsonInput.ProjectMetaData;
+import com.daimler.sechub.domain.administration.user.User;
 import com.daimler.sechub.sharedkernel.Profiles;
 import com.daimler.sechub.sharedkernel.RoleConstants;
 import com.daimler.sechub.sharedkernel.configuration.AbstractAllowSecHubAPISecurityConfiguration;
@@ -43,56 +52,64 @@ import com.daimler.sechub.test.TestPortProvider;
 
 @RunWith(SpringRunner.class)
 @WebMvcTest(ProjectAdministrationRestController.class)
-@ContextConfiguration(classes = { ProjectAdministrationRestController.class,
-		ProjectAdministrationRestControllerMockTest.SimpleTestConfiguration.class })
+@ContextConfiguration(classes = { ProjectAdministrationRestController.class, ProjectAdministrationRestControllerMockTest.SimpleTestConfiguration.class })
 @WithMockUser(authorities = RoleConstants.ROLE_SUPERADMIN)
-@ActiveProfiles({Profiles.TEST, Profiles.ADMIN_ACCESS})
+@ActiveProfiles({ Profiles.TEST, Profiles.ADMIN_ACCESS })
 public class ProjectAdministrationRestControllerMockTest {
 
-	private static final int PORT_USED = TestPortProvider.DEFAULT_INSTANCE.getWebMVCTestHTTPSPort();
+    private static final int PORT_USED = TestPortProvider.DEFAULT_INSTANCE.getWebMVCTestHTTPSPort();
 
-	@Autowired
-	private MockMvc mockMvc;
+    @Autowired
+    private MockMvc mockMvc;
+    
+    @MockBean
+    ProjectCreationService creationService;
 
-	@MockBean
-	ProjectCreationService creationService;
+    @MockBean
+    ProjectAssignOwnerService assignOwnerService;
 
-	@MockBean
-	ProjectAssignUserService assignUserService;
+    @MockBean
+    ProjectAssignUserService assignUserService;
 
-	@MockBean
-	ProjectDeleteService projectDeleteService;
+    @MockBean
+    ProjectDeleteService projectDeleteService;
 
-	@MockBean
-	ProjectUnassignUserService unassignUserService;
+    @MockBean
+    ProjectUnassignUserService unassignUserService;
 
-	@MockBean
-	ProjectDetailInformationService detailService;
+    @MockBean
+    ProjectDetailInformationService detailService;
 
-	@MockBean
-	ProjectRepository mockedProjectRepository;
+    @MockBean
+    ProjectDetailChangeService detailChangeService;
 
-	@MockBean
-	CreateProjectInputValidator createProjectInputvalidator;
+    @MockBean
+    ProjectRepository mockedProjectRepository;
+    
+    @MockBean
+    ProjectTransactionService transactionService;
 
-	@Before
-	public void before() {
-		when(createProjectInputvalidator.supports(ProjectJsonInput.class)).thenReturn(true);
-	}
+    @MockBean
+    CreateProjectInputValidator createProjectInputvalidator;
 
-	@Test
-	public void when_admin_tries_to_list_all_projects_all_2_projects_from_repo_are_returned_in_string_array() throws Exception {
-		/* prepare */
-		List<Project> list = new ArrayList<>();
-		Project project1 = new Project();
-		project1.id="project1";
-		Project project2 = new Project();
-		project2.id="project2";
-		list.add(project1);
-		list.add(project2);
-		when(mockedProjectRepository.findAll()).thenReturn(list);
+    @Before
+    public void before() {
+        when(createProjectInputvalidator.supports(ProjectJsonInput.class)).thenReturn(true);
+    }
 
-		/* execute + test @formatter:off */
+    @Test
+    public void when_admin_tries_to_list_all_projects_all_2_projects_from_repo_are_returned_in_string_array() throws Exception {
+        /* prepare */
+        List<Project> list = new ArrayList<>();
+        Project project1 = new Project();
+        project1.id = "project1";
+        Project project2 = new Project();
+        project2.id = "project2";
+        list.add(project1);
+        list.add(project2);
+        when(mockedProjectRepository.findAll()).thenReturn(list);
+
+        /* execute + test @formatter:off */
         this.mockMvc.perform(
         		get(https(PORT_USED).buildAdminListsProjectsUrl()).
         		contentType(MediaType.APPLICATION_JSON_VALUE)
@@ -103,12 +120,12 @@ public class ProjectAdministrationRestControllerMockTest {
         		);
 
 		/* @formatter:on */
-	}
+    }
 
-	@Test
-	public void when_validator_marks_no_errors___calling_create_project_url_calls_create_service_and_returns_http_200() throws Exception {
+    @Test
+    public void when_validator_marks_no_errors___calling_create_project_url_calls_create_service_and_returns_http_200() throws Exception {
 
-		/* execute + test @formatter:off */
+        /* execute + test @formatter:off */
         this.mockMvc.perform(
         		post(https(PORT_USED).buildAdminCreatesProjectUrl()).
         		contentType(MediaType.APPLICATION_JSON_VALUE).
@@ -121,12 +138,12 @@ public class ProjectAdministrationRestControllerMockTest {
 		verify(creationService).
 			createProject("projectId1","description1","ownerName1", new LinkedHashSet<>(Arrays.asList(new URI("192.168.1.1"), new URI("192.168.1.2"))), new ProjectMetaData());
 		/* @formatter:on */
-	}
+    }
 
-	@Test
-	public void when_validator_marks_errors___calling_create_project_url_never_calls_create_service_but_returns_http_400() throws Exception {
-		/* prepare */
-		doAnswer(new Answer<Void>() {
+    @Test
+    public void when_validator_marks_errors___calling_create_project_url_never_calls_create_service_but_returns_http_400() throws Exception {
+        /* prepare */
+        doAnswer(new Answer<Void>() {
             public Void answer(InvocationOnMock invocation) {
                 Errors errors = invocation.getArgument(1);
                 errors.reject("testerror");
@@ -134,8 +151,7 @@ public class ProjectAdministrationRestControllerMockTest {
             }
         }).when(createProjectInputvalidator).validate(any(ProjectJsonInput.class), any(Errors.class));
 
-
-		/* execute + test @formatter:off */
+        /* execute + test @formatter:off */
 		  this.mockMvc.perform(
 	        		post(https(PORT_USED).buildAdminCreatesProjectUrl()).
 	        		contentType(MediaType.APPLICATION_JSON_VALUE)
@@ -146,12 +162,12 @@ public class ProjectAdministrationRestControllerMockTest {
 
 		  verifyNoInteractions(creationService);
 		/* @formatter:on */
-	}
+    }
 
-	@Test
-	public void delete_project_calls_delete_service() throws Exception {
+    @Test
+    public void delete_project_calls_delete_service() throws Exception {
 
-		/* execute + test @formatter:off */
+        /* execute + test @formatter:off */
 		this.mockMvc.perform(
 				delete(https(PORT_USED).buildAdminDeletesProject(PROJECT_ID.pathElement()),"projectId1").
 				contentType(MediaType.APPLICATION_JSON_VALUE)
@@ -159,14 +175,75 @@ public class ProjectAdministrationRestControllerMockTest {
 		andExpect(status().isOk());
 
 		/* @formatter:on */
-		verify(projectDeleteService).deleteProject("projectId1");
-	}
+        verify(projectDeleteService).deleteProject("projectId1");
+    }
 
-	@TestConfiguration
-	@Profile(Profiles.TEST)
-	@EnableAutoConfiguration
-	public static class SimpleTestConfiguration extends AbstractAllowSecHubAPISecurityConfiguration {
+    @Test
+    public void get_project_details_returns_project_details() throws Exception {
+                
+        Project project = new Project();
+        project.id = "project1";
+        project.description = "description";
+        project.owner = new User();
+        
+        ProjectDetailInformation details = new ProjectDetailInformation(project);
+        
+        when(detailService.fetchDetails(matches("project1"))).thenReturn(details);
 
-	}
+        /* execute + test @formatter:off */
+        this.mockMvc.perform(
+                get(https(PORT_USED).buildAdminFetchProjectInfoUrl(PROJECT_ID.pathElement()), "project1").
+                contentType(MediaType.APPLICATION_JSON_VALUE).
+                accept(MediaType.APPLICATION_JSON_VALUE)
+                ).
+        andExpect(status().isOk()).
+        andExpect(jsonPath("$.projectId", CoreMatchers.equalTo("project1"))).
+        andExpect(jsonPath("$.description", CoreMatchers.equalTo("description"))).
+        andExpect(jsonPath("$.owner", CoreMatchers.nullValue())).
+        andExpect(jsonPath("$.users", CoreMatchers.notNullValue()));
+        
+        verify(detailService).fetchDetails(matches("project1"));
+        /* @formatter:on */
+    }
+    
+    @Test
+    public void change_project_calls_change_details() throws Exception {
+
+        /* execute + test @formatter:off */
+        this.mockMvc.perform(
+                post(https(PORT_USED).buildAdminChangesProjectDescriptionUrl("project1")).
+                contentType(MediaType.APPLICATION_JSON_VALUE).
+                accept(MediaType.APPLICATION_JSON_VALUE).
+                content("{\"description\":\"new description\"}")
+                ).
+        andDo(print()).
+        andExpect(status().isOk()).
+        andReturn();
+        
+        verify(detailChangeService).changeProjectDescription(matches("project1"), any());
+        /* @formatter:on */
+    }
+    
+    @Test
+    public void when_admin_tries_to_change_project_description_but_request_body_is_missing() throws Exception {
+
+        /* execute + test @formatter:off */
+        
+        this.mockMvc.perform(
+                post(https(PORT_USED).buildAdminChangesProjectDescriptionUrl(PROJECT_ID.pathElement()), "project1").
+                contentType(MediaType.APPLICATION_JSON).
+                content("")
+                ).
+        andExpect(status().isBadRequest());
+        
+        /* @formatter:on */
+    }    
+    
+    @TestConfiguration
+    @Profile(Profiles.TEST)
+    @EnableAutoConfiguration
+    public static class SimpleTestConfiguration extends AbstractAllowSecHubAPISecurityConfiguration {
+
+    }
 
 }

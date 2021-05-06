@@ -42,5 +42,9 @@ public enum InputCacheIdentifier{
 	
 	PROJECT_IDS,
 	
+	MAPPING_ID,
+	
+	PROJECT_DESCRIPTION,
+	
 	
 }
